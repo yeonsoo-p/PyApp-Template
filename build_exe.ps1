@@ -3,7 +3,7 @@
 
 param(
     [string]$OutputName = "",  # Will be read from pyproject.toml if not provided
-    [string]$PythonVersion = "3.12",
+    [string]$PythonVersion = "3.13",
     [string]$pyappVersion = ""  # Use latest version for better defaults
 )
 
@@ -152,38 +152,43 @@ if ($eggInfo) {
 }
 
 # Clean PyApp runtime directories (created when the exe runs)
-# PyApp creates directories like .pyapp_XXXXXX in the local directory
-$pyappDirs = Get-ChildItem -Path $scriptPath -Filter ".pyapp_*" -Directory -ErrorAction SilentlyContinue
-if ($pyappDirs) {
-    Write-Host "Cleaning local PyApp runtime directories..." -ForegroundColor Cyan
-    foreach ($dir in $pyappDirs) {
-        Remove-Item -Path $dir.FullName -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
-    }
-}
 
 # Clean PyApp data from AppData directories
 $appDataLocal = [Environment]::GetFolderPath('LocalApplicationData')
 $appDataRoaming = [Environment]::GetFolderPath('ApplicationData')
 
-# Check LocalAppData for PyApp directories
-$localPyAppPath = Join-Path $appDataLocal "pyapp"
-if (Test-Path $localPyAppPath) {
-    Write-Host "Cleaning PyApp data from LocalAppData..." -ForegroundColor Cyan
-    Remove-Item -Path $localPyAppPath -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+# Clean all files and directories containing $OutputName in LocalAppData
+if (Test-Path $appDataLocal) {
+    Write-Host "Cleaning $OutputName-related data from LocalAppData..." -ForegroundColor Cyan
+    
+    # Find and remove all directories containing $OutputName
+    $dirsToRemove = Get-ChildItem -Path $appDataLocal -Directory -Recurse -Filter "*$OutputName*" -ErrorAction SilentlyContinue
+    foreach ($dir in $dirsToRemove) {
+        Remove-Item -Path $dir.FullName -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+    }
+    
+    # Find and remove all files containing $OutputName
+    $filesToRemove = Get-ChildItem -Path $appDataLocal -File -Recurse -Filter "*$OutputName*" -ErrorAction SilentlyContinue
+    foreach ($file in $filesToRemove) {
+        Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+    }
 }
 
-# Check for application-specific directories in LocalAppData
-$appSpecificPath = Join-Path $appDataLocal $OutputName
-if (Test-Path $appSpecificPath) {
-    Write-Host "Cleaning $OutputName data from LocalAppData..." -ForegroundColor Cyan
-    Remove-Item -Path $appSpecificPath -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
-}
-
-# Check RoamingAppData for PyApp directories (less common but possible)
-$roamingPyAppPath = Join-Path $appDataRoaming "pyapp"
-if (Test-Path $roamingPyAppPath) {
-    Write-Host "Cleaning PyApp data from RoamingAppData..." -ForegroundColor Cyan
-    Remove-Item -Path $roamingPyAppPath -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+# Clean all files and directories containing $OutputName in RoamingAppData
+if (Test-Path $appDataRoaming) {
+    Write-Host "Cleaning $OutputName-related data from RoamingAppData..." -ForegroundColor Cyan
+    
+    # Find and remove all directories containing $OutputName
+    $dirsToRemove = Get-ChildItem -Path $appDataRoaming -Directory -Recurse -Filter "*$OutputName*" -ErrorAction SilentlyContinue
+    foreach ($dir in $dirsToRemove) {
+        Remove-Item -Path $dir.FullName -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+    }
+    
+    # Find and remove all files containing $OutputName
+    $filesToRemove = Get-ChildItem -Path $appDataRoaming -File -Recurse -Filter "*$OutputName*" -ErrorAction SilentlyContinue
+    foreach ($file in $filesToRemove) {
+        Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+    }
 }
 
 # Build the package
@@ -224,16 +229,17 @@ $env:PYAPP_PIP_EXTERNAL = "true"
 $env:PYAPP_PYTHON_VERSION = $PythonVersion
 $env:PYAPP_IS_GUI = "true"
 
-# Explicitly set the distribution embed option
+# Configure PyApp to use managed Python
 $env:PYAPP_DISTRIBUTION_EMBED = "false"
 $env:PYAPP_PIP_ALLOW_CONFIG = "true"
+$env:PYAPP_FULL_ISOLATION = "true"
+$env:PYAPP_SKIP_INSTALL = "false"
 
 # Debug: Show what we're setting
 Write-Host "Debug: PYAPP_PYTHON_VERSION = $($env:PYAPP_PYTHON_VERSION)" -ForegroundColor Yellow
 
-# Let PyApp handle distribution selection
-# Remove PYAPP_DISTRIBUTION_SOURCE to use PyApp's defaults
-Remove-Item Env:\PYAPP_DISTRIBUTION_SOURCE -ErrorAction SilentlyContinue
+# PyApp will automatically handle distribution format
+# The pyvenv.cfg will be created at runtime in the PyApp cache directory
 
 # Display configuration
 Write-Host "Configuration:" -ForegroundColor Cyan
