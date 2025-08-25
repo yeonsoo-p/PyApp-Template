@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(mkdir:*)",
+      "Bash(\"C:\\workspace\\PyApp-Template\\venv313\\Scripts\\activate.bat\")",
+      "Bash(pip install:*)",
+      "Bash(\"C:\\workspace\\PyApp-Template\\venv313\\Scripts\\python.exe\" -m pip install pandas tabulate)",
+      "Bash(C:workspacePyApp-Templatevenv313Scriptspython.exe -m userprocessor --help)",
+      "Bash(C:\\workspace\\PyApp-Template\\venv313\\Scripts\\python.exe -m userprocessor --help)",
+      "Bash(cmd:*)",
+      "Bash(C:workspacePyApp-Templatevenv313Scriptsactivate.bat)",
+      "Bash(python:*)",
+      "Bash(powershell:*)",
+      "Bash(del \"C:\\workspace\\PyApp-Template\\build_with_pyapp.ps1\")",
+      "Bash(uv pip install:*)",
+      "Bash(git clone:*)",
+      "Bash(set PYAPP_DISTRIBUTION_SOURCE=https://github.com/astral-sh/python-build-standalone/releases/latest/download/)",
+      "Bash(set PYAPP_PROJECT_NAME=userprocessor)",
+      "Bash(set PYAPP_PROJECT_VERSION=0.1.0)",
+      "Bash(set PYAPP_PROJECT_PATH=C:workspacePyApp-Templatedistuserprocessor-0.1.0-py3-none-any.whl)",
+      "Bash(set PYAPP_PYTHON_VERSION=3.13)",
+      "Bash(set PYAPP_EXEC_MODULE=userprocessor)",
+      "Bash(set PYAPP_PIP_EXTERNAL=true)",
+      "Bash(cargo build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
