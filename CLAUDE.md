@@ -4,83 +4,106 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Python package called `userprocessor` that processes and displays user data from CSV files. The project uses PyApp for building standalone executables from the Python package. It uses modern `pyproject.toml` for package configuration following PEP 517/518 standards.
+This repository contains two Python applications that can be built into standalone Windows executables using PyApp:
+
+1. **fileviewer** - A tkinter-based GUI application for browsing and viewing file contents
+2. **userprocessor** - A CLI tool for processing CSV files (legacy, being phased out)
+
+The project uses PyApp (a Rust-based Python application bundler) to create self-contained executables with embedded Python runtime.
 
 ## Development Environment
 
 - Python 3.8+ required (3.13 recommended)
-- Uses `uv` for package management
+- Uses `uv` for package management and building
+- Windows PowerShell for build scripts
 - Virtual environment: `venv313`
 
 ## Common Commands
 
-### Installation and Setup
-```bash
-# Install package in development mode using uv
-uv pip install -e .
+### Running Applications
 
-# Install dependencies
-uv pip install pandas tabulate
+```bash
+# Run fileviewer GUI (main application)
+python -m fileviewer
+# Or directly
+python fileviewer/app.py
+
+# Run userprocessor CLI (legacy)
+python -m userprocessor
+python -m userprocessor path/to/file.csv --stats --format fancy_grid
 ```
 
-### Running the Application
+### Building and Installation
+
 ```bash
-# Run with default username.csv
-python -m userprocessor
+# Install in development mode
+uv pip install -e .
 
-# Run with specific CSV file
-python -m userprocessor path/to/file.csv
+# Build Python wheel
+uv build --wheel --out-dir dist
 
-# Run with statistics
-python -m userprocessor --stats
-
-# Run with different table format
-python -m userprocessor --format fancy_grid
+# Build standalone Windows executable with icon
+.\build_exe.ps1
+# Or with custom options
+.\build_exe.ps1 -OutputName fileviewer -PythonVersion 3.13
 ```
 
 ### Code Quality
+
 ```bash
-# Run ruff for linting and formatting
+# Linting and formatting with ruff
 ruff check .
 ruff format .
 ```
 
-### Building Package
-```bash
-# Build wheel using uv (recommended)
-uv build --wheel --out-dir dist
-
-# Or using standard Python build
-python -m build --wheel --outdir dist
-```
-
-### Building Standalone Executable
-```bash
-# Build executable using PyApp (Windows PowerShell)
-.\build_with_pyapp.ps1
-
-# Build with custom output name
-.\build_with_pyapp.ps1 -OutputName myapp -PythonVersion 3.13
-```
-
 ## Architecture
 
-### Package Structure
-- `userprocessor/` - Main package directory
-  - `__main__.py` - CLI entry point, handles argument parsing
-  - `processor.py` - Core functionality for CSV processing
-  - `__init__.py` - Package initialization
+### FileViewer Application
 
-### Key Components
-1. **CSV Processing**: Uses pandas to read semicolon-delimited CSV files with automatic data type conversion for "Identifier" column
-2. **Display System**: Uses tabulate library for formatted table output with multiple format options
-3. **CLI Interface**: Argparse-based command-line interface with optional statistics display
-4. **PyApp Integration**: PowerShell build script that packages the Python application into a standalone Windows executable using PyApp and Rust
+The main GUI application located in `fileviewer/`:
+- **app.py** - Main tkinter application with FileViewerApp class
+  - Directory browsing with tree view
+  - File content display with syntax detection
+  - Icon embedding support (fileviewer/icon.ico)
+- **__main__.py** - Entry point that calls app.main()
+- Runs as standalone Python or can be built into exe
 
 ### Build System
-The project includes a sophisticated PyApp build system (`build_with_pyapp.ps1`) that:
-- Clones PyApp from GitHub
-- Builds Python wheel distribution
-- Configures PyApp environment variables
-- Compiles to standalone executable using Rust/Cargo
-- Embeds Python runtime using python-build-standalone releases
+
+**build_exe.ps1** - Sophisticated PyApp build script that:
+1. Checks/installs prerequisites (uv, cargo, git, rcedit)
+2. Auto-downloads rcedit from GitHub for icon embedding
+3. Clones PyApp repository fresh for each build
+4. Builds Python wheel using uv
+5. Configures PyApp environment variables
+6. Compiles to exe using Rust/Cargo
+7. Embeds icon using rcedit post-build
+8. Cleans build artifacts and PyApp cache from AppData
+
+Key build configuration:
+- `PYAPP_IS_GUI = "true"` for GUI applications
+- `PYAPP_PIP_EXTERNAL = "true"` for external pip
+- `PYAPP_FULL_ISOLATION = "true"` for clean environment
+- Uses python-build-standalone for embedded Python
+
+### Icon Embedding
+
+Icons are embedded into executables using rcedit:
+- Place icon at `{package_name}/icon.ico`
+- Build script automatically downloads rcedit if not present
+- Post-build embedding into the compiled exe
+
+## Project Configuration
+
+**pyproject.toml** defines:
+- Package metadata (name, version, dependencies)
+- Build system (setuptools)
+- Ruff linting configuration
+- Entry points for console scripts
+
+## Important Notes
+
+- The build script performs aggressive cleanup of PyApp runtime directories in AppData
+- Each build clones a fresh PyApp to avoid cache issues
+- Icon must be in .ico format for Windows executables
+- The fileviewer app uses only Python standard library (tkinter)
