@@ -185,6 +185,20 @@ if ($eggInfo) {
 $appDataLocal = [Environment]::GetFolderPath('LocalApplicationData')
 $appDataRoaming = [Environment]::GetFolderPath('ApplicationData')
 
+# Clean PyApp directories from AppData\Local
+$localPyAppDir = Join-Path $appDataLocal "pyapp"
+if (Test-Path $localPyAppDir) {
+    Write-Host "Cleaning PyApp cache from LocalAppData..." -ForegroundColor Cyan
+    Remove-Item -Path $localPyAppDir -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+}
+
+# Clean PyApp directories from AppData\Roaming
+$roamingPyAppDir = Join-Path $appDataRoaming "pyapp"
+if (Test-Path $roamingPyAppDir) {
+    Write-Host "Cleaning PyApp cache from RoamingAppData..." -ForegroundColor Cyan
+    Remove-Item -Path $roamingPyAppDir -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+}
+
 # Clean all files and directories containing $OutputName in LocalAppData
 if (Test-Path $appDataLocal) {
     Write-Host "Cleaning $OutputName-related data from LocalAppData..." -ForegroundColor Cyan
