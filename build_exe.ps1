@@ -48,6 +48,34 @@ if (-not (Test-Command "git")) {
 $gitVersion = git --version 2>&1
 Write-Host "[OK] Found Git: $gitVersion" -ForegroundColor Green
 
+# Check for rcedit (optional but recommended for icon embedding)
+$rceditPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "rcedit-x64.exe"
+if (-not (Test-Path $rceditPath)) {
+    if (-not (Test-Command "rcedit")) {
+        Write-Host "rcedit not found, attempting to download..." -ForegroundColor Yellow
+        try {
+            $rceditUrl = "https://github.com/electron/rcedit/releases/latest/download/rcedit-x64.exe"
+            $ProgressPreference = 'SilentlyContinue'
+            Invoke-WebRequest -Uri $rceditUrl -OutFile $rceditPath -UseBasicParsing
+            $ProgressPreference = 'Continue'
+            
+            if (Test-Path $rceditPath) {
+                Write-Host "[OK] Downloaded rcedit-x64.exe for icon embedding" -ForegroundColor Green
+            }
+        }
+        catch {
+            Write-Host "[WARNING] Could not download rcedit (icon embedding will be skipped)" -ForegroundColor Yellow
+            Write-Host "         Download manually from: https://github.com/electron/rcedit/releases" -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "[OK] Found rcedit in PATH" -ForegroundColor Green
+    }
+}
+else {
+    Write-Host "[OK] Found rcedit-x64.exe" -ForegroundColor Green
+}
+
 # Set working directory
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 if ([string]::IsNullOrEmpty($scriptPath)) {
@@ -286,6 +314,38 @@ $outputPath = Join-Path $scriptPath "$OutputName.exe"
 if (Test-Path $exePath) {
     Copy-Item $exePath $outputPath -Force
     Write-Host "Executable created: $outputPath" -ForegroundColor Green
+    
+    # Try to embed icon if available
+    $iconPath = Join-Path $scriptPath "$OutputName\icon.ico"
+    if (Test-Path $iconPath) {
+        Write-Host ""
+        Write-Host "Embedding icon..." -ForegroundColor Yellow
+        
+        # Use rcedit (already checked/downloaded at startup)
+        $rceditPath = Join-Path $scriptPath "rcedit-x64.exe"
+        
+        if (Test-Path $rceditPath) {
+            & $rceditPath $outputPath --set-icon $iconPath 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Icon embedded successfully" -ForegroundColor Green
+            }
+            else {
+                Write-Host "Failed to embed icon with rcedit" -ForegroundColor Yellow
+            }
+        }
+        elseif (Test-Command "rcedit") {
+            rcedit $outputPath --set-icon $iconPath 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Icon embedded successfully" -ForegroundColor Green
+            }
+            else {
+                Write-Host "Failed to embed icon with rcedit" -ForegroundColor Yellow
+            }
+        }
+        else {
+            Write-Host "rcedit not available - icon will not be embedded" -ForegroundColor Yellow
+        }
+    }
     
     # Display file info
     $fileInfo = Get-Item $outputPath
