@@ -24,7 +24,9 @@
       "Bash(cargo build:*)",
       "Bash(git commit:*)",
       "Bash(del setup.py)",
-      "Bash(uv build:*)"
+      "Bash(uv build:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
