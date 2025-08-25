@@ -26,7 +26,8 @@
       "Bash(del setup.py)",
       "Bash(uv build:*)",
       "Bash(git add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(.build_exe.ps1)"
     ],
     "deny": [],
     "ask": []

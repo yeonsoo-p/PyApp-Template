@@ -1,9 +1,10 @@
 # PowerShell script to build Python package with PyApp
-# This script clones PyApp and builds the userprocessor package into an executable
+# This script clones PyApp and builds the package into an executable
 
 param(
-    [string]$OutputName = "userprocessor",
-    [string]$PythonVersion = "3.13"
+    [string]$OutputName = "",  # Will be read from pyproject.toml if not provided
+    [string]$PythonVersion = "3.12",
+    [string]$pyappVersion = ""  # Use latest version for better defaults
 )
 
 Write-Host "=== PyApp Build Script ===" -ForegroundColor Cyan
@@ -47,15 +48,6 @@ if (-not (Test-Command "git")) {
 $gitVersion = git --version 2>&1
 Write-Host "[OK] Found Git: $gitVersion" -ForegroundColor Green
 
-# Check for Python (optional - uv can manage it)
-if (Test-Command "python") {
-    $pythonVersion = python --version 2>&1
-    Write-Host "[OK] Found Python: $pythonVersion" -ForegroundColor Green
-}
-else {
-    Write-Host "Note: Python not found in PATH, will use uv to manage Python" -ForegroundColor Yellow
-}
-
 # Set working directory
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 if ([string]::IsNullOrEmpty($scriptPath)) {
@@ -64,6 +56,38 @@ if ([string]::IsNullOrEmpty($scriptPath)) {
 Set-Location $scriptPath
 Write-Host ""
 Write-Host "Working directory: $scriptPath" -ForegroundColor Cyan
+
+# Read project metadata from pyproject.toml
+$pyprojectPath = Join-Path $scriptPath "pyproject.toml"
+if (Test-Path $pyprojectPath) {
+    $pyprojectContent = Get-Content $pyprojectPath -Raw
+    
+    # Read project name if not provided
+    if ([string]::IsNullOrEmpty($OutputName)) {
+        if ($pyprojectContent -match 'name\s*=\s*"([^"]+)"') {
+            $OutputName = $matches[1]
+            Write-Host "Project name from pyproject.toml: $OutputName" -ForegroundColor Cyan
+        }
+        else {
+            Write-Host "Error: Could not parse project name from pyproject.toml" -ForegroundColor Red
+            exit 1
+        }
+    }
+    
+    # Read project version
+    if ($pyprojectContent -match 'version\s*=\s*"([^"]+)"') {
+        $ProjectVersion = $matches[1]
+        Write-Host "Project version from pyproject.toml: $ProjectVersion" -ForegroundColor Cyan
+    }
+    else {
+        $ProjectVersion = "0.0.0"
+        Write-Host "Using default version: $ProjectVersion" -ForegroundColor Yellow
+    }
+}
+else {
+    Write-Host "Error: pyproject.toml not found" -ForegroundColor Red
+    exit 1
+}
 
 # Clone or update PyApp
 $pyappDir = Join-Path $scriptPath "pyapp"
@@ -82,15 +106,19 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Checkout specific version for compatibility
-$pyappVersion = "v0.28.0"  # Specify the version to use
-Write-Host "Checking out PyApp version $pyappVersion for compatibility..." -ForegroundColor Cyan
-Push-Location $pyappDir
-git checkout $pyappVersion 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Warning: Could not checkout version $pyappVersion, using latest" -ForegroundColor Yellow
+# Checkout specific version for stability
+if (-not [string]::IsNullOrEmpty($pyappVersion)) {
+    Write-Host "Checking out PyApp version $pyappVersion for stability..." -ForegroundColor Cyan
+    Push-Location $pyappDir
+    git checkout $pyappVersion 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Warning: Could not checkout version $pyappVersion, using latest" -ForegroundColor Yellow
+    }
+    Pop-Location
 }
-Pop-Location
+else {
+    Write-Host "Using latest PyApp version" -ForegroundColor Cyan
+}
 
 Write-Host "PyApp ready" -ForegroundColor Green
 
@@ -187,22 +215,32 @@ Write-Host ""
 Write-Host "Configuring PyApp..." -ForegroundColor Yellow
 
 $env:PYAPP_PROJECT_NAME = $OutputName
-$env:PYAPP_PROJECT_VERSION = "0.1.0"
+$env:PYAPP_PROJECT_VERSION = $ProjectVersion
 $env:PYAPP_PROJECT_PATH = $wheelFile.FullName
-$env:PYAPP_PYTHON_VERSION = $PythonVersion
-$env:PYAPP_EXEC_MODULE = "userprocessor"
+$env:PYAPP_EXEC_MODULE = $OutputName  # This will use the project name from pyproject.toml
 $env:PYAPP_PIP_EXTERNAL = "true"
 
-# PyApp will automatically download the appropriate Python distribution
-# based on PYAPP_PYTHON_VERSION. You can optionally specify:
-# $env:PYAPP_DISTRIBUTION_FORMAT = "install_only_stripped"  # For smaller size
+# Set Python version for PyApp
+$env:PYAPP_PYTHON_VERSION = $PythonVersion
+$env:PYAPP_IS_GUI = "true"
+
+# Explicitly set the distribution embed option
+$env:PYAPP_DISTRIBUTION_EMBED = "false"
+$env:PYAPP_PIP_ALLOW_CONFIG = "true"
+
+# Debug: Show what we're setting
+Write-Host "Debug: PYAPP_PYTHON_VERSION = $($env:PYAPP_PYTHON_VERSION)" -ForegroundColor Yellow
+
+# Let PyApp handle distribution selection
+# Remove PYAPP_DISTRIBUTION_SOURCE to use PyApp's defaults
+Remove-Item Env:\PYAPP_DISTRIBUTION_SOURCE -ErrorAction SilentlyContinue
 
 # Display configuration
 Write-Host "Configuration:" -ForegroundColor Cyan
 Write-Host "  Project: $OutputName" -ForegroundColor White
-Write-Host "  Version: 0.1.0" -ForegroundColor White
+Write-Host "  Version: $ProjectVersion" -ForegroundColor White
 Write-Host "  Python: $PythonVersion" -ForegroundColor White
-Write-Host "  Module: userprocessor" -ForegroundColor White
+Write-Host "  Module: $OutputName" -ForegroundColor White
 Write-Host "  Wheel: $($wheelFile.Name)" -ForegroundColor White
 
 # Build with PyApp
@@ -260,6 +298,4 @@ Write-Host "=== Build Complete ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "To test the executable, run:" -ForegroundColor Cyan
 Write-Host "  .\$OutputName.exe" -ForegroundColor White
-Write-Host "  .\$OutputName.exe --help" -ForegroundColor White
-Write-Host "  .\$OutputName.exe username.csv --stats" -ForegroundColor White
 Write-Host ""
