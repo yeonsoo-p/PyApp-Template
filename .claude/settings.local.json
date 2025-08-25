@@ -9,7 +9,6 @@
       "Bash(C:workspacePyApp-Templatevenv313Scriptspython.exe -m userprocessor --help)",
       "Bash(C:\\workspace\\PyApp-Template\\venv313\\Scripts\\python.exe -m userprocessor --help)",
       "Bash(cmd:*)",
-      "Bash(C:workspacePyApp-Templatevenv313Scriptsactivate.bat)",
       "Bash(python:*)",
       "Bash(powershell:*)",
       "Bash(del \"C:\\workspace\\PyApp-Template\\build_with_pyapp.ps1\")",
@@ -22,7 +21,8 @@
       "Bash(set PYAPP_PYTHON_VERSION=3.13)",
       "Bash(set PYAPP_EXEC_MODULE=userprocessor)",
       "Bash(set PYAPP_PIP_EXTERNAL=true)",
-      "Bash(cargo build:*)"
+      "Bash(cargo build:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
