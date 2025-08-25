@@ -19,32 +19,42 @@ function Test-Command {
 # Check prerequisites
 Write-Host "Checking prerequisites..." -ForegroundColor Yellow
 
-if (-not (Test-Command "python")) {
-    Write-Host "Error: Python is not installed or not in PATH" -ForegroundColor Red
-    Write-Host "Please ensure Python is installed and available in PATH" -ForegroundColor Red
+# Check for uv (required)
+if (-not (Test-Command "uv")) {
+    Write-Host "Error: uv is not installed or not in PATH" -ForegroundColor Red
+    Write-Host "Install uv with: powershell -ExecutionPolicy ByPass -c `"irm https://astral.sh/uv/install.ps1 | iex`"" -ForegroundColor Yellow
+    Write-Host "Or visit: https://docs.astral.sh/uv/getting-started/installation/" -ForegroundColor Yellow
     exit 1
 }
+$uvVersion = uv --version 2>&1
+Write-Host "[OK] Found uv: $uvVersion" -ForegroundColor Green
 
-$pythonVersion = python --version 2>&1
-Write-Host "Found Python: $pythonVersion" -ForegroundColor Green
-
+# Check for cargo (required)
 if (-not (Test-Command "cargo")) {
     Write-Host "Error: Rust/Cargo is not installed or not in PATH" -ForegroundColor Red
-    Write-Host "Please ensure Rust is installed from https://rustup.rs/" -ForegroundColor Red
+    Write-Host "Install Rust from: https://rustup.rs/" -ForegroundColor Yellow
     exit 1
 }
-
 $cargoVersion = cargo --version 2>&1
-Write-Host "Found Cargo: $cargoVersion" -ForegroundColor Green
+Write-Host "[OK] Found Cargo: $cargoVersion" -ForegroundColor Green
 
+# Check for git (required)
 if (-not (Test-Command "git")) {
     Write-Host "Error: Git is not installed or not in PATH" -ForegroundColor Red
-    Write-Host "Please ensure Git is installed" -ForegroundColor Red
+    Write-Host "Install Git from: https://git-scm.com/downloads" -ForegroundColor Yellow
     exit 1
 }
-
 $gitVersion = git --version 2>&1
-Write-Host "Found Git: $gitVersion" -ForegroundColor Green
+Write-Host "[OK] Found Git: $gitVersion" -ForegroundColor Green
+
+# Check for Python (optional - uv can manage it)
+if (Test-Command "python") {
+    $pythonVersion = python --version 2>&1
+    Write-Host "[OK] Found Python: $pythonVersion" -ForegroundColor Green
+}
+else {
+    Write-Host "Note: Python not found in PATH, will use uv to manage Python" -ForegroundColor Yellow
+}
 
 # Set working directory
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -88,31 +98,76 @@ Write-Host "PyApp ready" -ForegroundColor Green
 Write-Host ""
 Write-Host "Building Python package..." -ForegroundColor Yellow
 
-# Clean dist directory to ensure fresh build
+# Clean build artifacts to ensure fresh build
+Write-Host "Cleaning build artifacts..." -ForegroundColor Cyan
+
+# Clean dist directory
 $distDir = Join-Path $scriptPath "dist"
 if (Test-Path $distDir) {
-    Write-Host "Cleaning dist directory..." -ForegroundColor Cyan
-    Remove-Item -Path "$distDir/*" -Force -Recurse 2>&1 | Out-Null
+    Remove-Item -Path "$distDir/*" -Force -Recurse -ErrorAction SilentlyContinue 2>&1 | Out-Null
 }
 else {
     New-Item -ItemType Directory -Path $distDir | Out-Null
 }
 
-# Install build tools if needed
-Write-Host "Installing build tools..." -ForegroundColor Cyan
-if (Test-Command "uv") {
-    uv pip install --quiet build wheel 2>&1 | Out-Null
+# Clean other build directories created by pyproject build
+$buildDir = Join-Path $scriptPath "build"
+if (Test-Path $buildDir) {
+    Remove-Item -Path $buildDir -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
 }
-else {
-    python -m pip install --quiet build wheel 2>&1 | Out-Null
+
+$eggInfo = Get-ChildItem -Path $scriptPath -Filter "*.egg-info" -Directory -ErrorAction SilentlyContinue
+if ($eggInfo) {
+    foreach ($dir in $eggInfo) {
+        Remove-Item -Path $dir.FullName -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+    }
+}
+
+# Clean PyApp runtime directories (created when the exe runs)
+# PyApp creates directories like .pyapp_XXXXXX in the local directory
+$pyappDirs = Get-ChildItem -Path $scriptPath -Filter ".pyapp_*" -Directory -ErrorAction SilentlyContinue
+if ($pyappDirs) {
+    Write-Host "Cleaning local PyApp runtime directories..." -ForegroundColor Cyan
+    foreach ($dir in $pyappDirs) {
+        Remove-Item -Path $dir.FullName -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+    }
+}
+
+# Clean PyApp data from AppData directories
+$appDataLocal = [Environment]::GetFolderPath('LocalApplicationData')
+$appDataRoaming = [Environment]::GetFolderPath('ApplicationData')
+
+# Check LocalAppData for PyApp directories
+$localPyAppPath = Join-Path $appDataLocal "pyapp"
+if (Test-Path $localPyAppPath) {
+    Write-Host "Cleaning PyApp data from LocalAppData..." -ForegroundColor Cyan
+    Remove-Item -Path $localPyAppPath -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+}
+
+# Check for application-specific directories in LocalAppData
+$appSpecificPath = Join-Path $appDataLocal $OutputName
+if (Test-Path $appSpecificPath) {
+    Write-Host "Cleaning $OutputName data from LocalAppData..." -ForegroundColor Cyan
+    Remove-Item -Path $appSpecificPath -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
+}
+
+# Check RoamingAppData for PyApp directories (less common but possible)
+$roamingPyAppPath = Join-Path $appDataRoaming "pyapp"
+if (Test-Path $roamingPyAppPath) {
+    Write-Host "Cleaning PyApp data from RoamingAppData..." -ForegroundColor Cyan
+    Remove-Item -Path $roamingPyAppPath -Recurse -Force -ErrorAction SilentlyContinue 2>&1 | Out-Null
 }
 
 # Build the package
 Write-Host "Creating package distribution..." -ForegroundColor Cyan
 Set-Location $scriptPath
-python -m build --outdir $distDir 2>&1 | Out-Null
+
+# Build with uv (now required)
+Write-Host "Building wheel with uv..." -ForegroundColor Cyan
+uv build --wheel --out-dir $distDir 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: Failed to build Python package" -ForegroundColor Red
+    Write-Host "Error: Failed to build Python package with uv" -ForegroundColor Red
+    Write-Host "Make sure pyproject.toml is properly configured" -ForegroundColor Yellow
     exit 1
 }
 Write-Host "Package built successfully" -ForegroundColor Green
@@ -125,36 +180,7 @@ if (-not $wheelFile) {
 }
 Write-Host "Found wheel: $($wheelFile.Name)" -ForegroundColor Green
 
-# Clear PyApp and Rust cache to ensure fresh build
-Write-Host ""
-Write-Host "Clearing build caches..." -ForegroundColor Yellow
-
-# Clear entire target directory for complete rebuild
-$targetDir = Join-Path $pyappDir "target"
-if (Test-Path $targetDir) {
-    Write-Host "  Removing target directory..." -ForegroundColor Cyan
-    Remove-Item -Path $targetDir -Recurse -Force 2>&1 | Out-Null
-}
-
-# Clear Rust's global cache for this project
-$cargoHome = $env:CARGO_HOME
-if (-not $cargoHome) {
-    $cargoHome = Join-Path $env:USERPROFILE ".cargo"
-}
-$registryCache = Join-Path $cargoHome "registry\cache"
-if (Test-Path $registryCache) {
-    Write-Host "  Clearing Cargo registry cache..." -ForegroundColor Cyan
-    Get-ChildItem -Path $registryCache -Filter "*pyapp*" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue 2>&1 | Out-Null
-}
-
-# Clear Cargo.lock to ensure fresh dependency resolution
-$cargoLock = Join-Path $pyappDir "Cargo.lock"
-if (Test-Path $cargoLock) {
-    Write-Host "  Removing Cargo.lock..." -ForegroundColor Cyan
-    Remove-Item -Path $cargoLock -Force 2>&1 | Out-Null
-}
-
-Write-Host "Cache cleared" -ForegroundColor Green
+# No need to clear caches since we're doing a fresh clone of PyApp each time
 
 # Configure PyApp environment variables
 Write-Host ""
@@ -167,10 +193,9 @@ $env:PYAPP_PYTHON_VERSION = $PythonVersion
 $env:PYAPP_EXEC_MODULE = "userprocessor"
 $env:PYAPP_PIP_EXTERNAL = "true"
 
-# Set explicit Python distribution for Windows
-# Using python-build-standalone releases
-$pythonDistUrl = "https://github.com/astral-sh/python-build-standalone/releases/download/20241206/cpython-3.13.1+20241206-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"
-$env:PYAPP_DISTRIBUTION_SOURCE = $pythonDistUrl
+# PyApp will automatically download the appropriate Python distribution
+# based on PYAPP_PYTHON_VERSION. You can optionally specify:
+# $env:PYAPP_DISTRIBUTION_FORMAT = "install_only_stripped"  # For smaller size
 
 # Display configuration
 Write-Host "Configuration:" -ForegroundColor Cyan

@@ -58,6 +58,6 @@ This project includes a PyApp build script to create standalone Windows executab
 ```
 
 Prerequisites for building:
-- Python
+- uv (install with: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`)
 - Rust/Cargo (install from https://rustup.rs/)
-- Git
+- Git (install from https://git-scm.com/)

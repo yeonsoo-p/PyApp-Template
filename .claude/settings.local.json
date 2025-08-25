@@ -22,7 +22,9 @@
       "Bash(set PYAPP_EXEC_MODULE=userprocessor)",
       "Bash(set PYAPP_PIP_EXTERNAL=true)",
       "Bash(cargo build:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(del setup.py)",
+      "Bash(uv build:*)"
     ],
     "deny": [],
     "ask": []

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Python package called `userprocessor` that processes and displays user data from CSV files. The project uses PyApp for building standalone executables from the Python package.
+This is a Python package called `userprocessor` that processes and displays user data from CSV files. The project uses PyApp for building standalone executables from the Python package. It uses modern `pyproject.toml` for package configuration following PEP 517/518 standards.
 
 ## Development Environment
 
@@ -43,6 +43,15 @@ python -m userprocessor --format fancy_grid
 # Run ruff for linting and formatting
 ruff check .
 ruff format .
+```
+
+### Building Package
+```bash
+# Build wheel using uv (recommended)
+uv build --wheel --out-dir dist
+
+# Or using standard Python build
+python -m build --wheel --outdir dist
 ```
 
 ### Building Standalone Executable
